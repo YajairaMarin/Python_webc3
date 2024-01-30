@@ -17,5 +17,3 @@ for i in range (len(arreglo)):
   for j in range(i+1, len(arreglo)):
     if arreglo[i]+arreglo[j]==m:
       print("(" , arreglo[i] , "," , arreglo[j], ")") 
-    else:
-      print("Ninguna suma da el valor seleccionado")
