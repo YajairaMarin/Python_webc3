@@ -2,7 +2,6 @@
 import numpy as np
 from scipy.optimize import fsolve
 import pandas as pd
-import sqlite3
 
 
 class PVModel:
@@ -67,21 +66,12 @@ class PVModel:
         def f(I, V):
             return (I_ph - I_o * (np.exp((self.q * (V + I * self.R_s)) / (self.n * self.K * self.N_s * T)) - 1) -
                     (V + I * self.R_s) / self.R_sh - I)
-
-        """
-        # Bucle para calcular la corriente y la potencia para cada valor de voltaje
-        for i in range(len(Vpv)):
-            # Uso de fsolve para encontrar Ipv: Corriente de salida
-            Ipv[i] = fsolve(f, self.I_sc, args=(Vpv[i]))[0]  # Se toma el primer elemento del array resultante
-            # Cálculo de la potencia
-            Ppv[i] = Vpv[i] * Ipv[i]
-        """
         # Cálculo de la corriente para todo el array de voltaje usando fsolve y vectorización
         Ipv = fsolve(f, self.I_sc * np.ones_like(Vpv), args=(Vpv))
         Ppv = Vpv * Ipv  # Cálculo vectorizado de la potencia
 
         # Creación de un DataFrame con resultados
-        resultados = pd.DataFrame({'Temperatura (ºC)':T,'Irradiancia (W/m2)':G,'Corriente (A)': Ipv, 'Voltaje (V)': Vpv, 'Potencia (W)': Ppv})
+        resultados = pd.DataFrame({'Corriente (A)': Ipv, 'Voltaje (V)': Vpv, 'Potencia (W)': Ppv})
         # Encontrar el punto de máxima potencia
         max_power_idx = resultados['Potencia (W)'].idxmax()
         Vmpp = resultados.loc[max_power_idx, 'Voltaje (V)']
@@ -90,43 +80,12 @@ class PVModel:
         return resultados, Vmpp, Impp, P_max
 
 def main():
-    pv_model = PVModel(4, 3)
-    G = list(range(100, 1100, 100))
-    T = list(range(5, 50, 5))
+    # Crear un objeto de la clase PVModel
+    pv = PVModel(4,3)
+    # Calcular el modelo PV
+    resultados, Vmpp, Impp, P_max = pv.modelo_pv(G=1000, T=273+25)
+    print(resultados.head())
+    print(f"Vmp = {Vmpp:.2f} V, Imp = {Impp:.2f} A, Pmax = {P_max:.2f} W")
 
-    # Conexión a la base de datos utilizando context manager
-    with sqlite3.connect("data.db") as conn:
-        c = conn.cursor()
-
-        # Creación de la tabla (si no existe)
-        c.execute('''CREATE TABLE IF NOT EXISTS data (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            Temperatura INTEGER,
-            Irradiancia INTEGER,
-            Voltaje DOUBLE,
-            Corriente DOUBLE,
-            Potencia DOUBLE)''')
-
-        # Lista para almacenar los datos a insertar
-        data = []
-
-        # Bucle para calcular y guardar los resultados en la lista
-        for g in G:
-            for t in T:
-                resultados, Vmpp, Impp, Pmax = pv_model.modelo_pv(g, t + 273)
-                print(resultados.head())
-                print(f'temp= {t:.2f}ºC')
-                print(f'G= {g:.2f}ºC')
-                print(f'Vmp = {Vmpp:.2f} V')
-                print(f'Imp = {Impp:.2f} A')
-                print(f'Pmax = {Pmax:.2f} W')
-                data.append((t, g, Vmpp, Impp, Pmax))  # Tupla de datos
-
-        # Inserción de los datos en la base de datos
-        c.executemany('INSERT INTO data (Temperatura, Irradiancia, Voltaje, Corriente, Potencia) VALUES (?, ?, ?, ?, ?)', data)
-
-    print("Creado con éxito")
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-  
